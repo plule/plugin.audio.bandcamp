@@ -14,13 +14,6 @@ This file provides a simple python interface to bandcamp's api
 import urllib,urllib2
 import simplejson as json
 from collections import defaultdict
-import pickle
-
-try:
-    import StorageServer
-except:
-    import storageserverdummy as StorageServer
-cache = StorageServer.StorageServer("plugin.audio.bandcamp", 2)
 
 class keydefaultdict(defaultdict):
     def __missing__(self, key):
@@ -61,11 +54,7 @@ def set_and_test_key(key):
     api_key['val']=key
     test_api = call_api(MOD_BAND, FUNC_SEARCH, {'name':'test'})
     if 'error' in test_api:
-        #maybe cache error ?
-        cache.delete('%')
-        test_api = call_api(MOD_BAND, FUNC_SEARCH, {'name':'test'})
-        if 'error' in test_api:
-            return {'success':False, 'error_message':test_api['error_message']}
+        return {'success':False, 'error_message':test_api['error_message']}
     return {'success':True}
 
 #band_cache = keydefaultdict(
@@ -75,13 +64,10 @@ def set_and_test_key(key):
 #track_cache = keydefaultdict(
 #    lambda track_id: call_api(MOD_TRACK, FUNC_INFO, {'track_id':track_id}))
 
-def _call_api(module, function, params):
+def call_api(module, function, params):
     url = URL_API_BASE + module + URL_API_VERSIONS[module] + function + '?' + 'key=' + api_key['val'] + '&' + urllib.urlencode(params)
     print 'CALLING...........'+url
     return json.loads(urllib2.urlopen(url).read())
-
-def call_api(module, function, params):
-    return cache.cacheFunction(_call_api, module, function, params)
 
 def search_band(name):
     return call_api(MOD_BAND, FUNC_SEARCH, {'name':name})['results']
@@ -117,8 +103,6 @@ def band_info(band_id):
 
 def album_info(album_id):
     album = call_api(MOD_ALBUM, FUNC_INFO, {'album_id':album_id})
-    for track in album['tracks']:
-        cache.set('track_'+str(track['track_id']),pickle.dumps(track))
     return album
 '''    album = album_cache[album_id]
     for track in album['tracks']:
@@ -126,14 +110,10 @@ def album_info(album_id):
     return album'''
 
 def track_info(track_id): # manually cached because the album api gives also tracks info
-    cached = cache.get('track_'+str(track_id))
-    if cached:
-        return pickle.loads(cached)
-    else:
-        return call_api(MOD_TRACK, FUNC_INFO, {'track_id':track_id})
+    return call_api(MOD_TRACK, FUNC_INFO, {'track_id':track_id})
 #    return track_cache[track_id]
 
-def track_infos(track_ids):
+'''def track_infos(track_ids):
     cached = {}
     batch = []
     batched = {}
@@ -146,3 +126,4 @@ def track_infos(track_ids):
         batched = call_api(MOD_TRACK, FUNC_INFO, {'track_id':','.join(batch)})
         track_cache.update(batched)
     return dict(cached.item()+batched.item())
+'''
