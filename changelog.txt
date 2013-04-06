@@ -1,3 +1,5 @@
 0.0.1
 - Nothing to see here
 
+0.0.2
+- switch to xbmcswift2, basic fonctionalities

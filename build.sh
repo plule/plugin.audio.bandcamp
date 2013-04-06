@@ -10,7 +10,8 @@ mkdir plugin.audio.bandcamp/resources/language/English
 mkdir plugin.audio.bandcamp/resources/lib
 mkdir plugin.audio.bandcamp/resources/media
 
-cp LICENSE.txt README default.py addon.xml changelog.txt icon.png plugin.audio.bandcamp
+cp LICENSE.txt README.md default.py addon.xml changelog.txt icon.png plugin.audio.bandcamp
+mv plugin.audio.bandcamp/README.md plugin.audio.bandcamp/README
 cp resources/__init__.py resources/settings.xml plugin.audio.bandcamp/resources/
 cp resources/data/key.txt plugin.audio.bandcamp/resources/data
 cp resources/language/English/strings.xml plugin.audio.bandcamp/resources/language/English
