@@ -37,7 +37,7 @@ URL_API_VERSIONS={
     MOD_BAND:'3/',
     MOD_ALBUM:'2/',
     MOD_TRACK:'3/',
-    MOD_TRACK:'1/'
+    MOD_URL:'1/'
     }
 
 class KeyError(Exception):
@@ -54,6 +54,7 @@ class Bandcamp():
         self.discographies = self.api.get_storage('discographies', TTL = 60)
         self.albums = self.api.get_storage('albums', TTL = 60)
         self.tracks = self.api.get_storage('tracks', TTL = 60)
+        self.urls = self.api.get_storage('urls', TTL = 60)
         
     def get_module(self):
         return self.api
@@ -114,3 +115,9 @@ class Bandcamp():
             return self.tracks[track_id]
         self.tracks[track_id] = self.call_api(MOD_TRACK, FUNC_INFO, {'track_id':track_id})
         return self.tracks[track_id]
+    
+    def url_info(self, url):
+        if url in self.urls:
+            return self.urls[url]
+        self.urls[url] = self.call_api(MOD_URL, FUNC_INFO, {'url':url})
+        return self.urls[url]
