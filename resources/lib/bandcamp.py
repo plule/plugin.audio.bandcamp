@@ -218,6 +218,10 @@ class Bandcamp():
         return self.tracks[track_id]
 
     def tracks_info(self, track_ids):
+        if(len(track_ids) == 0):
+            return []
+        if(len(track_ids) == 1):
+            return [self.track_info(track_ids[0])]
         not_cached = []
         cached = []
         for track_id in track_ids:
@@ -225,6 +229,10 @@ class Bandcamp():
                 cached.append(self.tracks[track_id])
             else:
                 not_cached.append(track_id)
+        if(len(not_cached) == 0):
+            return cached
+        if(len(not_cached) == 1):
+            return cached + [self.track_info(track_ids[0])]
         batch = ','.join([str(tid) for tid in not_cached])
         new = self.call_api(MOD_TRACK, FUNC_INFO, {'track_id':batch}, True)
         for track in new.values():

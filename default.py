@@ -196,17 +196,19 @@ def get_album_item(album, band = None):
 
 
 def get_track_item(track, album = None, band = None):
+    isSingle = False
     if not album:
         if 'album_id' in track and track['album_id']:
             album = bc.album_info(track['album_id'])
-        else: album = {}
+        else:album = {}
+            
     if not band:
         band = bc.band_info(track['band_id'])
 
     art = track.get('large_art_url', album.get('large_art_url',None))
     release_date = track.get('release_date', album.get('release_date',None))
     artist = track.get('artist', album.get('artist', band['name']))
-    if 'number' in track:
+    if track.get('number',None):
         label = u"{0} - {1}".format(track['number'], track['title'])
     else: label = track['title']
     li = ListItem(
