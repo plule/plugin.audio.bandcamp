@@ -12,14 +12,13 @@ This file provides a simple python interface to bandcamp's api
 
 import urllib,urllib2
 import simplejson as json
-from xbmcswift2 import Module
 import CommonFunctions
 import HTMLParser
 
 h = HTMLParser.HTMLParser()
 
 common = CommonFunctions
-common.plugin = "Bandcamp-0.0.2"
+common.plugin = "Bandcamp-0.0.3"
 
 ## Normal API
 

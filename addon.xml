@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.audio.bandcamp"
        name="Bandcamp"
-       version="0.0.2"
+       version="0.0.3"
        provider-name="plule">
   <requires>
     <import addon="xbmc.python" version="2.1.0"/>
@@ -15,7 +15,9 @@
   <extension point="xbmc.addon.metadata">
     <summary lang="en">XBMC Plugin for Bandcamp</summary>
     <description lang="en">Bandcamp helps artists sell their music and merch directly to their fans, and helps fans discover new music and directly support those who make it.</description>
+	<summary lang="fr">Plugin XBMC pour Bandcamp</summary>
+	<description lang="fr">Bandcamp aide les artistes à vendre leur musique directement à leurs fans, et aide les fans à découvrir de la nouvelle musique et à soutenir ceux qui la font.</description>
     <platform>all</platform>
-    <language>en</language>
+    <language></language>
   </extension>
 </addon>

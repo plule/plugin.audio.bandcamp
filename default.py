@@ -13,29 +13,28 @@ libDir = xbmc.translatePath(os.path.join(resDir,  'lib'))
 datDir=  xbmc.translatePath(os.path.join(resDir,  'data'))
 keyFile = xbmc.translatePath(os.path.join(datDir, 'key.txt'))
 
+STRINGS = {
+    'Search':30000,
+    'band':30001,
+    'album':30002,
+    'track':30003,
+    'by':30004,
+    'Previous page':30005,
+    'Next page':30006,
+    'Other tracks':30007
+}
+
 @plugin.route('/')
 def index():
     items = [{
-        'label': 'Search',
+        'label': _('Search'),
         'path': plugin.url_for('show_search'),
-    },{
-        'label': 'cults band',
-        'path': plugin.url_for('play_url', url='cults.bandcamp.com'),
-        'is_playable': True
-    },{
-        'label': 'spiderwebbed album',
-        'path': plugin.url_for('play_url', url='http://stumbleine.bandcamp.com/album/spiderwebbed'),
-        'is_playable': True
-    },{
-        'label': 'glacier track',
-        'path': plugin.url_for('play_url', url='http://stumbleine.bandcamp.com/track/glacier'),
-        'is_playable': True
     }]
     return items
 
 @plugin.route('/search/')
 def show_search():
-    search_string = plugin.keyboard(heading='Search')
+    search_string = plugin.keyboard(heading=_('search'))
     if search_string == '':
         return None
     if search_string:
@@ -55,13 +54,13 @@ def search(search_string, page=0):
     results,has_prev,has_next = bc.search(search_string, page)
     items = []
     for result in results:
-        item_type = {'ARTIST':'band','ALBUM':'album','TRACK':'track'}.get(result['type'],None)
+        item_type = {'ARTIST':_('band'),'ALBUM':_('album'),'TRACK':_('track')}.get(result['type'],None)
         label1 = result['name']
         label2 = item_type
         if result['genre']:
             label2 = label2 + ' - ' + result['genre']
         if result['by']:
-            label2 = label2 + ' by ' + result['by']
+            label2 = label2 + ' ' + _('by') + ' ' + result['by']
         label2 = label2.strip()
         
         if label2 != '':
@@ -77,12 +76,12 @@ def search(search_string, page=0):
         items.append(li)
     if has_prev:
         items.insert(0, {
-            'label': '<< Previous',
+            'label': '<< '+ _('Previous page'),
             'path': plugin.url_for('search_page', search_string=search_string, page=str(page - 1))
         })
     if has_next:
         items.append({
-            'label': 'Next >>',
+            'label': _('Next page') + ' >>',
             'path': plugin.url_for('search_page', search_string=search_string, page=str(page + 1))
         })
     plugin.add_sort_method(xbmcplugin.SORT_METHOD_TITLE_IGNORE_THE, '%X')
@@ -102,7 +101,7 @@ def show_band(band_id):
     album_items = [get_album_item(album, band) for album in albums]
     if len(bc.get_singles(band_id)) > 0:
         album_items.append({
-            'label': 'Single tracks',
+            'label': _('Other tracks'),
             'path' : plugin.url_for('show_band_singles', band_id=band_id)
         })
     return album_items
@@ -244,6 +243,13 @@ def year_from_timestamp(timestamp):
         return datetime.datetime.fromtimestamp(timestamp).year
     except:
         return None
+
+def _(string_id):
+    if string_id in STRINGS:
+        return plugin.get_string(STRINGS[string_id])
+    else:
+        plugin.log.warning('String is missing: %s' % string_id)
+        return string_id
 
 if __name__ == '__main__':
     bc = Bandcamp(open(keyFile,'r').read().rstrip(), plugin)
