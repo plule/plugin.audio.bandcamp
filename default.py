@@ -1,9 +1,9 @@
-import sys,time,datetime
-from xbmcswift2 import Plugin,Module
+import datetime
+from xbmcswift2 import Plugin
 from xbmcswift2 import ListItem
-from xbmcswift2 import xbmc, xbmcgui
+from xbmcswift2 import xbmc, xbmcplugin
 import os
-from resources.lib.bandcamp import Bandcamp, KeyError, ApiError
+from resources.lib.bandcamp import Bandcamp
 
 plugin = Plugin('bandcamp')
 baseDir = plugin.addon.getAddonInfo('path')
@@ -15,7 +15,6 @@ keyFile = xbmc.translatePath(os.path.join(datDir, 'key.txt'))
 
 @plugin.route('/')
 def index():
-    button = xbmcgui.ControlButton(10,10,20,20, "hello")
     items = [{
         'label': 'Search',
         'path': plugin.url_for('show_search'),
@@ -44,10 +43,15 @@ def show_search():
         )
         plugin.redirect(url)
 
+@plugin.route('/search/<search_string>/<page>', name='search_page')
 @plugin.route('/search/<search_string>/')
-def search(search_string):
-    results = bc.search(search_string)
-    ret = []
+def search(search_string, page=0):
+    page = int(page)
+    givenpage = page
+    if(page ==0):
+        page = 1
+    results,has_prev,has_next = bc.search(search_string, page)
+    items = []
     for result in results:
         item_type = {'ARTIST':'band','ALBUM':'album','TRACK':'track'}.get(result['type'],None)
         label1 = result['name']
@@ -58,27 +62,54 @@ def search(search_string):
             label2 = label2 + ' by ' + result['by']
         label2 = label2.strip()
         
-        if label2 != '':
-            label1 = "{0} ({1})".format(label1, label2)
+ #       if label2 != '':
+ #            label1 = u"{0} ({1})".format(label1, label2)
 
         li = ListItem(
             label = label1,
- #           label2 = label2,
+            label2 = label2,
             icon = result['art'],
             thumbnail = result['art'],
             path = plugin.url_for('show_url', url = result['url'])
         )
-        ret.append(li)
-        print li.as_xbmc_listitem().getLabel2()
-    return ret
-#    return [get_band_item(band) for band in bands]
+        items.append(li)
+    if has_prev:
+        items.insert(0, {
+            'label': '<< Previous',
+            'path': plugin.url_for('search_page', search_string=search_string, page=str(page - 1))
+        })
+    if has_next:
+        items.append({
+            'label': 'Next >>',
+            'path': plugin.url_for('search_page', search_string=search_string, page=str(page + 1))
+        })
+    plugin.add_sort_method(xbmcplugin.SORT_METHOD_TITLE_IGNORE_THE, '%X')
+    if(givenpage == 0):
+        return plugin.finish(items, update_listing=False)
+    else:
+        return plugin.finish(items, update_listing=True)
+        
+
+
 
 @plugin.route('/band/<band_id>/')
 def show_band(band_id):
     plugin.set_content('albums')
     band = bc.band_info(band_id)
-    albums = bc.discography(band_id)
-    return [get_album_item(album, band) for album in albums]
+    albums = bc.get_albums(band_id)
+    album_items = [get_album_item(album, band) for album in albums]
+    if len(bc.get_singles(band_id)) > 0:
+        album_items.append({
+            'label': 'Single tracks',
+            'path' : plugin.url_for('show_band_singles', band_id=band_id)
+        })
+    return album_items
+
+@plugin.route('/band/<band_id>/singles/')
+def show_band_singles(band_id):
+    plugin.set_content('songs')
+    tracks = bc.get_singles(band_id)
+    return [get_track_item(track) for track in tracks]
 
 @plugin.route('/album/<album_id>/')
 def show_album(album_id):
@@ -137,14 +168,10 @@ def play_url(url):
 
 def get_band_item(band):
     li = ListItem(
-        label = '{0} ({1})'.format(band['name'], band['subdomain']),
+        label = u"{0} ({1})".format(band['name'], band['subdomain']),
         path = plugin.url_for('show_band', band_id = band['band_id'])
     )
     return li
-    items = [{
-        'label': band['name']+' ('+band['subdomain']+')',
-        'path': plugin.url_for('show_band', band_id = band['band_id'])
-    } for band in bands]
 
 def get_album_item(album, band = None):
     if (not band) and (not 'artist' in album):
@@ -154,7 +181,7 @@ def get_album_item(album, band = None):
     artist = album.get('artist', band['name'])
 
     li = ListItem(
-        label = '{1} - {0}'.format(album['title'], year),
+        label = u"{1} - {0}".format(album['title'], year),
         icon=album['large_art_url'],
         thumbnail=album['large_art_url'],
         path=plugin.url_for('show_album', album_id = album['album_id'])
@@ -170,16 +197,20 @@ def get_album_item(album, band = None):
 
 def get_track_item(track, album = None, band = None):
     if not album:
-        album = bc.album_info(track['album_id'])
+        if 'album_id' in track and track['album_id']:
+            album = bc.album_info(track['album_id'])
+        else: album = {}
     if not band:
         band = bc.band_info(track['band_id'])
 
-    art = track.get('large_art_url', album['large_art_url'])
-    release_date = int(track.get('release_date', album['release_date']))
+    art = track.get('large_art_url', album.get('large_art_url',None))
+    release_date = track.get('release_date', album.get('release_date',None))
     artist = track.get('artist', album.get('artist', band['name']))
-
+    if 'number' in track:
+        label = u"{0} - {1}".format(track['number'], track['title'])
+    else: label = track['title']
     li = ListItem(
-        label = '{0} - {1}'.format(track['number'], track['title']),
+        label = label,
         icon=art,
         thumbnail=art,
         path=plugin.url_for('play_track', track_id = track['track_id']),
@@ -188,10 +219,10 @@ def get_track_item(track, album = None, band = None):
     li.set_is_playable(True)
     infos = {
         'title':track['title'],
-        'tracknumber':track['number'],
+        'tracknumber':track.get('number',None),
         'duration':track['duration'],
         'lyrics':track.get('lyrics',''),
-        'album':album['title'],
+        'album':album.get('title',None),
         'artist':artist,
         'year':year_from_timestamp(release_date)
     }
@@ -204,7 +235,10 @@ def get_album_tracks(album_id):
     return [get_track_item(track, album, band) for track in album['tracks']]
 
 def year_from_timestamp(timestamp):
-    return datetime.datetime.fromtimestamp(timestamp).year
+    try:
+        return datetime.datetime.fromtimestamp(timestamp).year
+    except:
+        return None
 
 if __name__ == '__main__':
     bc = Bandcamp(open(keyFile,'r').read().rstrip(), plugin)

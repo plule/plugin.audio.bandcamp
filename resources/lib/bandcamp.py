@@ -60,7 +60,7 @@ def safe_get (l, idx, default):
     except IndexError:
         return default
 
-class KeyError(Exception):
+class ApiKeyError(Exception):
     pass
 
 class ApiError(Exception):
@@ -79,17 +79,41 @@ class Bandcamp():
     def get_module(self):
         return self.api
 
-    def call_api(self, module, function, params):
+        
+    def get_cached(self, func, *args, **kwargs):
+        '''Return the result of func with the given args and kwargs
+        from cache or execute it if needed'''
+        @self.api.cached(kwargs.pop('TTL', 1440))
+        def wrap(func_name, *args, **kwargs):
+            return func(*args, **kwargs)
+        return wrap(func.__name__, *args, **kwargs)
+
+    def _get_url(self, url):
+        return urllib2.urlopen(url).read()
+        
+    def get_url(self, url):
+        return self.get_cached(self._get_url, url)
+#        return self._get_url(url)
+
+    def get_api_url(self, module, function, params):
         params['key'] = self.key
-        url = URL_API_BASE + module + URL_API_VERSIONS[module] + function + '?' + urllib.urlencode(params)
+        return URL_API_BASE + module + URL_API_VERSIONS[module] + function + '?' + urllib.urlencode(params)
+
+    def call_api_url(self, url):
         print 'CALLING...........'+url
-        ret = json.loads(urllib2.urlopen(url).read())
+        ret = json.loads(self.get_url(url))
         if('error' in ret):
             if(ret['error_message'] == 'bad key'):
-                raise KeyError()
+                raise ApiKeyError()
             else:
                 raise ApiError()
-        return json.loads(urllib2.urlopen(url).read())
+        return ret
+
+    def call_api(self, module, function, params, batchmode=False):
+        url = self.get_api_url(module, function, params)
+        if batchmode:
+            url = url.replace('%2C', ',')
+        return self.call_api_url(url)
 
     def search_band(self, name):
         res = self.call_api(MOD_BAND, FUNC_SEARCH, {'name':name})['results']
@@ -100,9 +124,11 @@ class Bandcamp():
     def search_bands(self, names):
         return self.search_band(','.join(names)) #todo twelve max
 
-    def search(self, string):
-        url = BANDCAMP_URL + BANDCAMP_SEARCH + '?' + urllib.urlencode({'q':string})
-        html = urllib2.urlopen(url).read()
+    def search(self, string, page = 1):
+        url = BANDCAMP_URL + BANDCAMP_SEARCH + '?' + urllib.urlencode({'q':string,'page':str(page)})
+        html = self.get_url(url)
+
+        # Get results
         result_part_html = common.parseDOM(html, 'ul', attrs = {'id':'items'})
         results_html = common.parseDOM(result_part_html, 'li', attrs = {'class':'searchresult'})
         results = []
@@ -135,21 +161,37 @@ class Bandcamp():
                 'art':art,
                 'by':by
             })
-        return results
-        
 
-    def isalbum(self, thing):
-        return 'album_id' in thing
+        # Get if prev or next
+        nextprev_html = common.parseDOM(html, 'div', attrs = {'class':'pager'})
+        prev_html = common.parseDOM(nextprev_html, 'a', attrs = {'class':'nextprev prev round4'})
+        next_html = common.parseDOM(nextprev_html, 'a', attrs = {'class':'nextprev next round4'})
+
+        return results, len(prev_html)>0, len(next_html)>0
 
     def discography(self, band_id):
         band_id = int(band_id)
         if band_id in self.discographies:
             return self.discographies[band_id]
-        self.discographies[band_id] = filter(self.isalbum, self.call_api(MOD_BAND, FUNC_DISCOGRAPHY, {'band_id':band_id})['discography']) #TODO : remove filter
-        return self.discographies[band_id]
+        return self.call_api(MOD_BAND, FUNC_DISCOGRAPHY, {'band_id':band_id})['discography']
+
+    def isalbum(self, thing):
+        return 'album_id' in thing
+
+    def istrack(self, thing):
+        return 'track_id' in thing
+
+    def get_albums(self, band_id):
+        return [item for item in self.discography(band_id) if self.isalbum(item)]
+
+    def get_singles(self, band_id):
+        tracks = [item for item in self.discography(band_id) if self.istrack(item)]
+        # hack to complete items
+        track_ids = [track['track_id'] for track in tracks]
+        return self.tracks_info(track_ids)
 
     def track_list(self, album_id):
-        return call_api(MOD_ALBUM, FUNC_INFO, {'album_id':album_id})['tracks']
+        return self.call_api(MOD_ALBUM, FUNC_INFO, {'album_id':album_id})['tracks']
 
     def band_info(self, band_id):
         band_id = int(band_id)
@@ -174,6 +216,21 @@ class Bandcamp():
             return self.tracks[track_id]
         self.tracks[track_id] = self.call_api(MOD_TRACK, FUNC_INFO, {'track_id':track_id})
         return self.tracks[track_id]
+
+    def tracks_info(self, track_ids):
+        not_cached = []
+        cached = []
+        for track_id in track_ids:
+            if track_id in self.tracks:
+                cached.append(self.tracks[track_id])
+            else:
+                not_cached.append(track_id)
+        batch = ','.join([str(tid) for tid in not_cached])
+        new = self.call_api(MOD_TRACK, FUNC_INFO, {'track_id':batch}, True)
+        for track in new.values():
+            track_id = int(track['track_id'])
+            self.tracks[track_id] = track
+        return new.values() + cached
     
     def url_info(self, url):
         if url in self.urls:
