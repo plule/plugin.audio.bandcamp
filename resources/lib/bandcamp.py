@@ -89,6 +89,7 @@ class Bandcamp():
         return wrap(func.__name__, *args, **kwargs)
 
     def _get_url(self, url):
+        print 'CALLING...........'+url
         return urllib2.urlopen(url).read()
         
     def get_url(self, url):
@@ -100,7 +101,6 @@ class Bandcamp():
         return URL_API_BASE + module + URL_API_VERSIONS[module] + function + '?' + urllib.urlencode(params)
 
     def call_api_url(self, url):
-        print 'CALLING...........'+url
         ret = json.loads(self.get_url(url))
         if('error' in ret):
             if(ret['error_message'] == 'bad key'):

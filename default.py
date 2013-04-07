@@ -36,6 +36,8 @@ def index():
 @plugin.route('/search/')
 def show_search():
     search_string = plugin.keyboard(heading='Search')
+    if search_string == '':
+        return None
     if search_string:
         url = plugin.url_for(
             endpoint='search',
@@ -62,15 +64,15 @@ def search(search_string, page=0):
             label2 = label2 + ' by ' + result['by']
         label2 = label2.strip()
         
- #       if label2 != '':
- #            label1 = u"{0} ({1})".format(label1, label2)
+        if label2 != '':
+            label1 = u"{0} ({1})".format(label1, label2)
 
         li = ListItem(
             label = label1,
             label2 = label2,
-            icon = result['art'],
-            thumbnail = result['art'],
-            path = plugin.url_for('show_url', url = result['url'])
+            icon = result.get('art',None),
+            thumbnail = result.get('art',None),
+            path = plugin.url_for('show_url', url = result.get('url',None))
         )
         items.append(li)
     if has_prev:
@@ -136,11 +138,11 @@ def play_track(track_id):
 @plugin.route('/url/<url>/')
 def show_url(url):
     url_info = bc.url_info(url)
-    if 'track_id' in url_info:
+    if url_info.get('track_id',None):
         plugin.redirect(plugin.url_for('show_track', track_id = url_info['track_id']))
-    elif 'album_id' in url_info:
+    elif url_info.get('album_id',None):
         plugin.redirect(plugin.url_for('show_album', album_id = url_info['album_id']))
-    elif 'band_id' in url_info:
+    elif url_info.get('band_id',None):
         plugin.redirect(plugin.url_for('show_band', band_id = url_info['band_id']))
 
 @plugin.route('/url/<url>/play_a_track/')
@@ -149,32 +151,34 @@ def play_url(url):
         url_info = bc.url_info(url)
     except:
         return None
-    if 'track_id' in url_info:
+    if url_info.get('track_id',None):
         plugin.redirect(plugin.url_for('play_track', track_id = url_info['track_id']))
-    elif 'album_id' in url_info:
+    elif url_info.get('album_id',None):
         album = bc.album_info(url_info['album_id'])
         plugin.redirect(plugin.url_for('play_track', track_id = album['tracks'][0]['track_id']))
-    elif 'band_id' in url_info:
+    elif url_info.get('band_id',None):
         discography = bc.discography(url_info['band_id'])
         if len(discography) == 0:
             return None
         first = discography[0]
-        if 'track_id' in first:
+        if url_info.get('track_id',None):
             plugin.redirect(plugin.url_for('play_track', track_id = first['track_id']))
-        elif 'album_id' in first:
+        elif url_info.get('album_id',None):
             album = bc.album_info(first['album_id'])
             plugin.redirect(plugin.url_for('play_track', track_id = album['tracks'][0]['track_id']))
         return None
 
 def get_band_item(band):
+    name = band.get('name',None)
+    domain = band.get('subdomain',None)
     li = ListItem(
-        label = u"{0} ({1})".format(band['name'], band['subdomain']),
+        label = u"{0} ({1})".format(name, domain),
         path = plugin.url_for('show_band', band_id = band['band_id'])
     )
     return li
 
 def get_album_item(album, band = None):
-    if (not band) and (not 'artist' in album):
+    if (not band) and (not album.get('artist',None)):
         band = bc.band_info(album['band_id'])
 
     year = year_from_timestamp(int(album['release_date']))
@@ -196,12 +200,11 @@ def get_album_item(album, band = None):
 
 
 def get_track_item(track, album = None, band = None):
-    isSingle = False
     if not album:
-        if 'album_id' in track and track['album_id']:
+        if track.get('album_id',None):
             album = bc.album_info(track['album_id'])
         else:album = {}
-            
+
     if not band:
         band = bc.band_info(track['band_id'])
 
