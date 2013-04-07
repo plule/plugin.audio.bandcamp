@@ -41,14 +41,37 @@ def show_search():
         url = plugin.url_for(
             endpoint='search',
             search_string=search_string
-            )
+        )
         plugin.redirect(url)
 
 @plugin.route('/search/<search_string>/')
 def search(search_string):
-    plugin.set_content('artists')
-    bands = bc.search_band(search_string)
-    return [get_band_item(band) for band in bands]
+    results = bc.search(search_string)
+    ret = []
+    for result in results:
+        item_type = {'ARTIST':'band','ALBUM':'album','TRACK':'track'}.get(result['type'],None)
+        label1 = result['name']
+        label2 = item_type
+        if result['genre']:
+            label2 = label2 + ' - ' + result['genre']
+        if result['by']:
+            label2 = label2 + ' by ' + result['by']
+        label2 = label2.strip()
+        
+        if label2 != '':
+            label1 = "{0} ({1})".format(label1, label2)
+
+        li = ListItem(
+            label = label1,
+ #           label2 = label2,
+            icon = result['art'],
+            thumbnail = result['art'],
+            path = plugin.url_for('show_url', url = result['url'])
+        )
+        ret.append(li)
+        print li.as_xbmc_listitem().getLabel2()
+    return ret
+#    return [get_band_item(band) for band in bands]
 
 @plugin.route('/band/<band_id>/')
 def show_band(band_id):

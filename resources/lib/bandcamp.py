@@ -13,6 +13,15 @@ This file provides a simple python interface to bandcamp's api
 import urllib,urllib2
 import simplejson as json
 from xbmcswift2 import Module
+import CommonFunctions
+import HTMLParser
+
+h = HTMLParser.HTMLParser()
+
+common = CommonFunctions
+common.plugin = "Bandcamp-0.0.2"
+
+## Normal API
 
 URL_API_BASE='http://api.bandcamp.com/api/'
 
@@ -31,14 +40,25 @@ FUNC_INFO='info'
 ACTIONS={
     1:'download',
     2:'buy'
-    }
+}
 
 URL_API_VERSIONS={
     MOD_BAND:'3/',
     MOD_ALBUM:'2/',
     MOD_TRACK:'3/',
     MOD_URL:'1/'
-    }
+}
+
+## Additional hacks
+
+BANDCAMP_URL='https://bandcamp.com/'
+BANDCAMP_SEARCH='search'
+
+def safe_get (l, idx, default):
+    try:
+        return l[idx]
+    except IndexError:
+        return default
 
 class KeyError(Exception):
     pass
@@ -60,7 +80,8 @@ class Bandcamp():
         return self.api
 
     def call_api(self, module, function, params):
-        url = URL_API_BASE + module + URL_API_VERSIONS[module] + function + '?' + 'key=' + self.key + '&' + urllib.urlencode(params)
+        params['key'] = self.key
+        url = URL_API_BASE + module + URL_API_VERSIONS[module] + function + '?' + urllib.urlencode(params)
         print 'CALLING...........'+url
         ret = json.loads(urllib2.urlopen(url).read())
         if('error' in ret):
@@ -78,6 +99,44 @@ class Bandcamp():
 
     def search_bands(self, names):
         return self.search_band(','.join(names)) #todo twelve max
+
+    def search(self, string):
+        url = BANDCAMP_URL + BANDCAMP_SEARCH + '?' + urllib.urlencode({'q':string})
+        html = urllib2.urlopen(url).read()
+        result_part_html = common.parseDOM(html, 'ul', attrs = {'id':'items'})
+        results_html = common.parseDOM(result_part_html, 'li', attrs = {'class':'searchresult'})
+        results = []
+        for result in results_html:
+            url_html = common.parseDOM(result, 'div', attrs = {'class':'itemurl'})
+            url = safe_get(common.parseDOM(url_html, 'a', ret = 'href'),0,None)
+            item_type = safe_get(common.parseDOM(result, 'div', attrs = {'class':'itemtype'}),0,None)
+            url_name = common.parseDOM(result, 'div', attrs = {'class':'heading'})
+            name = safe_get(common.parseDOM(url_name, 'a'),0,None)
+            if name:
+                name = h.unescape(name)
+
+            genre = safe_get(common.parseDOM(result, 'div', attrs = {'class':'genre'}),0,None)
+            if genre:
+                genre = h.unescape(genre[7:])
+            art_html = common.parseDOM(result, 'div', attrs = {'class':'art'})
+            art = safe_get(common.parseDOM(art_html, 'img', ret = 'src'),0,None)
+
+            by = safe_get(common.parseDOM(result, 'div', attrs = {'class':'subhead'}),0,None)
+            if not by.startswith('by '):
+                by = None
+            if by:
+                by = h.unescape(by[3:])
+            
+            results.append({
+                'name':name,
+                'url': url,
+                'type':item_type,
+                'genre':genre,
+                'art':art,
+                'by':by
+            })
+        return results
+        
 
     def isalbum(self, thing):
         return 'album_id' in thing
