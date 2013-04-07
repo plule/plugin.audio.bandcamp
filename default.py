@@ -3,7 +3,7 @@ from xbmcswift2 import Plugin,Module
 from xbmcswift2 import ListItem
 from xbmcswift2 import xbmc, xbmcgui
 import os
-from resources.lib.bandcamp import Bandcamp
+from resources.lib.bandcamp import Bandcamp, KeyError, ApiError
 
 plugin = Plugin('bandcamp')
 baseDir = plugin.addon.getAddonInfo('path')
@@ -89,15 +89,28 @@ def show_url(url):
     elif 'band_id' in url_info:
         plugin.redirect(plugin.url_for('show_band', band_id = url_info['band_id']))
 
-@plugin.route('/url/<url>/play/')
+@plugin.route('/url/<url>/play_a_track/')
 def play_url(url):
-    url_info = bc.url_info(url)
+    try:
+        url_info = bc.url_info(url)
+    except:
+        return None
     if 'track_id' in url_info:
         plugin.redirect(plugin.url_for('play_track', track_id = url_info['track_id']))
     elif 'album_id' in url_info:
-        plugin.redirect(plugin.url_for('show_album', album_id = url_info['album_id']))
+        album = bc.album_info(url_info['album_id'])
+        plugin.redirect(plugin.url_for('play_track', track_id = album['tracks'][0]['track_id']))
     elif 'band_id' in url_info:
-        plugin.redirect(plugin.url_for('show_band', band_id = url_info['band_id']))
+        discography = bc.discography(url_info['band_id'])
+        if len(discography) == 0:
+            return None
+        first = discography[0]
+        if 'track_id' in first:
+            plugin.redirect(plugin.url_for('play_track', track_id = first['track_id']))
+        elif 'album_id' in first:
+            album = bc.album_info(first['album_id'])
+            plugin.redirect(plugin.url_for('play_track', track_id = album['tracks'][0]['track_id']))
+        return None
 
 def get_band_item(band):
     li = ListItem(
