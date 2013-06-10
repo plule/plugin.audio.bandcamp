@@ -1,3 +1,5 @@
+(note : this project is currently on hold because bandcamp is making a new API and does not distribute new API keys at the moment. If you see an update on this subject, email me at pierre~at~lule~dot~fr)
+
 XBMC Bandcamp plugin
 ====================
 
